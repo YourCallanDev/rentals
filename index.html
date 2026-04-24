@@ -90,7 +90,48 @@
     </div>
   </div>
 
-  <script>
+  <div id="rentalModal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 w-full max-w-md rounded-3xl p-6 border border-slate-700">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-2xl font-bold">Create Rental</h2>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white text-2xl">×</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-slate-300 mb-2">Vehicle</label>
+          <input id="modalVehicle" disabled class="w-full bg-slate-800 rounded-xl p-3 border border-slate-700" />
+        </div>
+
+        <div>
+          <label class="block text-sm text-slate-300 mb-2">Username</label>
+          <input id="modalUsername" placeholder="Enter username"
+            class="w-full bg-slate-800 rounded-xl p-3 border border-slate-700" />
+        </div>
+
+        <div>
+          <label class="block text-sm text-slate-300 mb-2">Slots (1-4)</label>
+          <select id="modalSlots" class="w-full bg-slate-800 rounded-xl p-3 border border-slate-700">
+            <option value="1">1 Slot</option>
+            <option value="2">2 Slots</option>
+            <option value="3">3 Slots (10% Off)</option>
+            <option value="4">4 Slots (20% Off)</option>
+          </select>
+        </div>
+
+        <div id="pricePreview" class="bg-slate-800 rounded-xl p-4 text-lg font-semibold">
+          Total: 0
+        </div>
+
+        <button onclick="confirmRental()"
+          class="w-full bg-green-600 hover:bg-green-700 rounded-xl p-4 font-bold text-lg">
+          Confirm Rental
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
     const SLOT_MINUTES = 12;
 
     const cars = [
@@ -112,6 +153,8 @@
       { name: 'Yellow Beatle', price: 700 },
       { name: 'Classic 4 Seater', price: 300 },
       { name: 'Standars SUV', price: 400 },
+      { name: 'Standard SUV 2', price: 400 },
+      { name: 'White Luxury', price: 600 },
       { name: 'Black Pick-Up', price: 400 },
       { name: 'Christmas Van', price: 300 }
     ];
@@ -136,35 +179,85 @@
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
-    function rentCar(carName) {
-      const username = prompt('Enter username:');
-      if (!username) return;
+    let selectedVehicle = null;
 
-      const slots = parseInt(prompt('How many slots? (1-4)'), 10);
+    function openRentalModal(carName) {
+      selectedVehicle = cars.find(c => c.name === carName);
 
-      if (isNaN(slots) || slots < 1 || slots > 4) {
-        alert('Slots must be between 1 and 4.');
+      document.getElementById('rentalModal').classList.remove('hidden');
+      document.getElementById('modalVehicle').value = selectedVehicle.name;
+      document.getElementById('modalUsername').value = '';
+      document.getElementById('modalSlots').value = '1';
+
+      updatePricePreview();
+    }
+
+    function closeModal() {
+      document.getElementById('rentalModal').classList.add('hidden');
+    }
+
+    function updatePricePreview() {
+      const slots = parseInt(document.getElementById('modalSlots').value);
+      const discount = getDiscount(slots);
+      const total = Math.round(selectedVehicle.price * slots * (1 - discount));
+
+      document.getElementById('pricePreview').innerHTML = `
+        <div>${slots} Slot${slots > 1 ? 's' : ''}</div>
+        <div class="text-green-400 mt-1">Total: ${total}</div>
+      `;
+    }
+
+    document.addEventListener('change', (e) => {
+      if (e.target.id === 'modalSlots') {
+        updatePricePreview();
+      }
+    });
+
+    function confirmRental() {
+      const username = document.getElementById('modalUsername').value.trim();
+      const slots = parseInt(document.getElementById('modalSlots').value);
+
+      if (!username) {
+        alert('Enter a username.');
         return;
       }
 
-      const car = cars.find(c => c.name === carName);
       const discount = getDiscount(slots);
-      const total = Math.round(car.price * slots * (1 - discount));
+      const total = Math.round(selectedVehicle.price * slots * (1 - discount));
 
       const startTime = Date.now();
       const endTime = startTime + (slots * SLOT_MINUTES * 60 * 1000);
 
       rentals.push({
-        car: car.name,
-        price: car.price,
+        car: selectedVehicle.name,
+        price: selectedVehicle.price,
         username,
         slots,
         total,
         startTime,
-        endTime,
-        completed: false
+        endTime
       });
 
+      saveData();
+      closeModal();
+      render();
+    }
+
+    function adjustMinutes(index) {
+      const extraMinutes = parseInt(prompt('Add or remove minutes. Example: 5 or -5'), 10);
+
+      if (isNaN(extraMinutes)) return;
+
+      rentals[index].endTime += extraMinutes * 60 * 1000;
+
+      saveData();
+      render();
+    }
+
+    function cancelRental(index) {
+      if (!confirm('Cancel this rental?')) return;
+
+      rentals.splice(index, 1);
       saveData();
       render();
     }
@@ -197,7 +290,7 @@
                 <p class="text-slate-300 mt-1">Base Price: ${car.price}</p>
               </div>
 
-              <button onclick="rentCar('${car.name.replace(/'/g, "\\'")}')"
+              <button onclick="openRentalModal('${car.name.replace(/'/g, "\\'")}')"
                 class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl font-semibold">
                 Rent
               </button>
@@ -242,7 +335,7 @@
               </div>
             </div>
 
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2 min-w-[220px]">
               ${remaining <= 0 ? `
                 <button onclick="completeRental(${index})"
                   class="bg-green-600 hover:bg-green-700 px-5 py-3 rounded-xl font-bold">
@@ -253,6 +346,16 @@
                   Active Rental
                 </div>
               `}
+
+              <button onclick="adjustMinutes(${index})"
+                class="bg-yellow-600 hover:bg-yellow-700 px-5 py-3 rounded-xl font-bold">
+                Adjust Time
+              </button>
+
+              <button onclick="cancelRental(${index})"
+                class="bg-red-600 hover:bg-red-700 px-5 py-3 rounded-xl font-bold">
+                Cancel Rental
+              </button>
             </div>
           </div>
         `;
