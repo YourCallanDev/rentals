@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vehicle Rental Slot System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #0f172a;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+
+    .card {
+      transition: 0.2s ease;
+    }
+
+    .card:hover {
+      transform: scale(1.02);
+    }
+
+    .flash-red {
+      animation: flashRed 1s infinite;
+    }
+
+    .pulse-green {
+      animation: pulseGreen 1.5s infinite;
+    }
+
+    @keyframes flashRed {
+      0%, 100% {
+        background-color: #7f1d1d;
+      }
+      50% {
+        background-color: #dc2626;
+      }
+    }
+
+    @keyframes pulseGreen {
+      0% {
+        box-shadow: 0 0 0 0 rgba(34,197,94,0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 20px rgba(34,197,94,0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(34,197,94,0);
+      }
+    }
+  </style>
+</head>
+<body class="p-6">
+
+  <div class="max-w-7xl mx-auto">
+
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-4xl font-bold">Vehicle Rental System</h1>
+        <p class="text-slate-300 mt-1">12 minute rental slots • Max 4 slots per booking</p>
+      </div>
+
+      <div class="bg-slate-800 rounded-2xl p-4 w-full md:w-auto">
+        <div class="text-lg font-semibold">Discount Rules</div>
+        <div class="text-sm text-slate-300 mt-2">3 Slots = 10% Off</div>
+        <div class="text-sm text-slate-300">4 Slots = 20% Off</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-green-400">Available Vehicles</h2>
+          <span id="availableCount" class="bg-green-600 px-3 py-1 rounded-full text-sm">0</span>
+        </div>
+
+        <div id="availableCars" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-red-400">Currently Rented</h2>
+          <span id="rentedCount" class="bg-red-600 px-3 py-1 rounded-full text-sm">0</span>
+        </div>
+
+        <div id="rentedCars" class="grid grid-cols-1 gap-4"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const SLOT_MINUTES = 12;
+
+    const cars = [
+      { name: 'Classic Motorbike', price: 300 },
+      { name: 'Business Car', price: 650 },
+      { name: 'Yellow Yeep', price: 600 },
+      { name: 'Red Classic', price: 600 },
+      { name: 'Blue Beatle', price: 800 },
+      { name: 'Random Other', price: 800 },
+      { name: 'Classic Red Icon', price: 1000 },
+      { name: 'Classic Black Icon', price: 1000 },
+      { name: 'Red Convertable', price: 700 },
+      { name: 'Black Convertable', price: 700 },
+      { name: 'Luxury Jeep', price: 700 },
+      { name: 'Luxury SUV 1', price: 650 },
+      { name: 'Luxury SUV 2', price: 650 },
+      { name: 'Dune Buggy', price: 800 },
+      { name: 'Rolls Royce', price: 700 },
+      { name: 'Yellow Beatle', price: 700 },
+      { name: 'Classic 4 Seater', price: 300 },
+      { name: 'Standars SUV', price: 400 },
+      { name: 'Black Pick-Up', price: 400 },
+      { name: 'Christmas Van', price: 300 }
+    ];
+
+    let rentals = JSON.parse(localStorage.getItem('rentals')) || [];
+
+    function saveData() {
+      localStorage.setItem('rentals', JSON.stringify(rentals));
+    }
+
+    function getDiscount(slots) {
+      if (slots === 3) return 0.10;
+      if (slots === 4) return 0.20;
+      return 0;
+    }
+
+    function formatTime(ms) {
+      const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function rentCar(carName) {
+      const username = prompt('Enter username:');
+      if (!username) return;
+
+      const slots = parseInt(prompt('How many slots? (1-4)'), 10);
+
+      if (isNaN(slots) || slots < 1 || slots > 4) {
+        alert('Slots must be between 1 and 4.');
+        return;
+      }
+
+      const car = cars.find(c => c.name === carName);
+      const discount = getDiscount(slots);
+      const total = Math.round(car.price * slots * (1 - discount));
+
+      const startTime = Date.now();
+      const endTime = startTime + (slots * SLOT_MINUTES * 60 * 1000);
+
+      rentals.push({
+        car: car.name,
+        price: car.price,
+        username,
+        slots,
+        total,
+        startTime,
+        endTime,
+        completed: false
+      });
+
+      saveData();
+      render();
+    }
+
+    function completeRental(index) {
+      rentals.splice(index, 1);
+      saveData();
+      render();
+    }
+
+    function render() {
+      const availableDiv = document.getElementById('availableCars');
+      const rentedDiv = document.getElementById('rentedCars');
+
+      availableDiv.innerHTML = '';
+      rentedDiv.innerHTML = '';
+
+      const rentedCars = rentals.map(r => r.car);
+
+      cars.forEach(car => {
+        if (!rentedCars.includes(car.name)) {
+          const card = document.createElement('div');
+
+          card.className = 'card bg-slate-800 rounded-2xl p-5 border border-slate-700';
+
+          card.innerHTML = `
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h3 class="text-xl font-bold">${car.name}</h3>
+                <p class="text-slate-300 mt-1">Base Price: ${car.price}</p>
+              </div>
+
+              <button onclick="rentCar('${car.name.replace(/'/g, "\\'")}')"
+                class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl font-semibold">
+                Rent
+              </button>
+            </div>
+          `;
+
+          availableDiv.appendChild(card);
+        }
+      });
+
+      rentals.forEach((rental, index) => {
+        const remaining = rental.endTime - Date.now();
+
+        const card = document.createElement('div');
+
+        let extraClass = 'bg-slate-800 border-slate-700';
+
+        if (remaining <= 60000 && remaining > 0) {
+          extraClass = 'flash-red border-red-500';
+        }
+
+        if (remaining <= 0) {
+          extraClass = 'pulse-green bg-green-900 border-green-500';
+        }
+
+        card.className = `card rounded-2xl p-5 border ${extraClass}`;
+
+        card.innerHTML = `
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-3 flex-wrap">
+                <h3 class="text-2xl font-bold">${rental.car}</h3>
+                <span class="bg-slate-700 px-3 py-1 rounded-full text-sm">
+                  ${rental.slots} Slot${rental.slots > 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div class="mt-3 space-y-1 text-slate-200">
+                <p><strong>User:</strong> ${rental.username}</p>
+                <p><strong>Total Paid:</strong> ${rental.total}</p>
+                <p><strong>Time Remaining:</strong> ${remaining > 0 ? formatTime(remaining) : 'FINISHED'}</p>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+              ${remaining <= 0 ? `
+                <button onclick="completeRental(${index})"
+                  class="bg-green-600 hover:bg-green-700 px-5 py-3 rounded-xl font-bold">
+                  Return Vehicle
+                </button>
+              ` : `
+                <div class="bg-slate-900 px-5 py-3 rounded-xl text-center">
+                  Active Rental
+                </div>
+              `}
+            </div>
+          </div>
+        `;
+
+        rentedDiv.appendChild(card);
+      });
+
+      document.getElementById('availableCount').textContent =
+        cars.length - rentals.length;
+
+      document.getElementById('rentedCount').textContent = rentals.length;
+    }
+
+    render();
+
+    setInterval(() => {
+      render();
+    }, 1000);
+  </script>
+</body>
+</html>
